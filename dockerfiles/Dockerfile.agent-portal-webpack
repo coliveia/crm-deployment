@@ -1,0 +1,41 @@
+# Stage 1: Build
+FROM node:22-alpine AS builder
+
+WORKDIR /build
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY src ./src
+COPY public ./public
+COPY webpack.config.js ./
+COPY .babelrc ./
+
+# Build application with webpack
+RUN npm run build
+
+# Stage 2: Runtime
+FROM nginx:alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy nginx config
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy built app from builder
+COPY --from=builder /build/dist /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Run nginx
+CMD ["nginx", "-g", "daemon off;"]

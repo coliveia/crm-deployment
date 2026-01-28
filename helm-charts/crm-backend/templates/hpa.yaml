@@ -5,7 +5,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $service.name }}-hpa
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "crm-backend.namespace" . }}
   labels:
     app: {{ $service.name }}
     chart: {{ include "crm-backend.chart" . }}
