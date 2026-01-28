@@ -1,0 +1,100 @@
+# Default values for crm-frontend
+# This is a YAML-formatted file.
+
+global:
+  environment: dev
+  registry: lazarusacr.azurecr.io
+  imagePullPolicy: IfNotPresent
+
+# Frontend Applications
+applications:
+  agentPortal:
+    name: crm-agent-portal
+    image: crm-agent-portal
+    tag: latest
+    port: 80
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    
+  workflowAdminPortal:
+    name: crm-workflow-admin-portal
+    image: crm-workflow-admin-portal
+    tag: latest
+    port: 80
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+# BFF Service URL
+bffServiceUrl: http://crm-bff-service:3001
+
+# Common settings
+commonSettings:
+  logLevel: INFO
+  healthCheckInterval: 30
+  healthCheckTimeout: 10
+  healthCheckStartPeriod: 5
+  healthCheckRetries: 3
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: crm-frontend
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101  # nginx user
+  fsGroup: 101
+
+# Node Affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: crm-agent.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: crm-agent-portal
+    - host: crm-workflow.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: crm-workflow-admin-portal
+  tls:
+    - secretName: crm-agent-tls
+      hosts:
+        - crm-agent.example.com
+    - secretName: crm-workflow-tls
+      hosts:
+        - crm-workflow.example.com

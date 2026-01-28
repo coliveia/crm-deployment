@@ -1,0 +1,54 @@
+# Kafka Helm Chart Values
+
+auth:
+  enabled: false
+
+replicaCount: 3
+
+broker:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
+
+zookeeper:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClassName: default
+
+metrics:
+  kafka:
+    enabled: true
+  jmx:
+    enabled: true
+
+topics:
+  - name: crm.customer.events
+    partitions: 3
+    replicationFactor: 3
+  - name: crm.case.events
+    partitions: 3
+    replicationFactor: 3
+  - name: crm.interaction.events
+    partitions: 3
+    replicationFactor: 3
+  - name: crm.workflow.events
+    partitions: 3
+    replicationFactor: 3
+  - name: crm.copilot.events
+    partitions: 3
+    replicationFactor: 3

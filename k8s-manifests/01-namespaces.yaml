@@ -1,0 +1,44 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crm
+  labels:
+    name: crm
+    environment: dev
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crm-backend
+  labels:
+    name: crm-backend
+    environment: dev
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crm-frontend
+  labels:
+    name: crm-frontend
+    environment: dev
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crm-infrastructure
+  labels:
+    name: crm-infrastructure
+    environment: dev
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crm-monitoring
+  labels:
+    name: crm-monitoring
+    environment: dev

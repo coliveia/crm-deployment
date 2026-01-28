@@ -1,0 +1,106 @@
+{{- range $app := .Values.applications }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $app.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $app.name }}
+    version: {{ $app.tag }}
+    chart: {{ include "crm-frontend.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ $app.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ $app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $app.name }}
+        version: {{ $app.tag }}
+    spec:
+      serviceAccountName: {{ include "crm-frontend.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      
+      # Init container to wait for BFF
+      initContainers:
+      - name: wait-for-bff
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z crm-bff-service 3001; do echo waiting for bff; sleep 2; done']
+
+      containers:
+      - name: {{ $app.name }}
+        image: "{{ .Values.global.registry }}/{{ $app.image }}:{{ $app.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        
+        ports:
+        - name: http
+          containerPort: {{ $app.port }}
+          protocol: TCP
+        
+        env:
+        - name: BFF_SERVICE_URL
+          value: {{ .Values.bffServiceUrl }}
+        
+        - name: ENVIRONMENT
+          value: {{ .Values.global.environment }}
+        
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        
+        - name: nginx-run
+          mountPath: /var/run
+        
+        # Probes
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ .Values.commonSettings.healthCheckStartPeriod }}
+          periodSeconds: {{ .Values.commonSettings.healthCheckInterval }}
+          timeoutSeconds: {{ .Values.commonSettings.healthCheckTimeout }}
+          failureThreshold: {{ .Values.commonSettings.healthCheckRetries }}
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        resources:
+          {{- toYaml $app.resources | nindent 12 }}
+      
+      volumes:
+      - name: nginx-cache
+        emptyDir: {}
+      
+      - name: nginx-run
+        emptyDir: {}
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

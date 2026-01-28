@@ -1,0 +1,177 @@
+{{- range $service := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $service.name }}
+    version: {{ $service.tag }}
+    chart: {{ include "crm-backend.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ $service.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ $service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $service.name }}
+        version: {{ $service.tag }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $service.port }}"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: {{ include "crm-backend.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      
+      # Init container to wait for dependencies
+      initContainers:
+      - name: wait-for-kafka
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z kafka-broker 9092; do echo waiting for kafka; sleep 2; done']
+      
+      - name: wait-for-redis
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z redis-master 6379; do echo waiting for redis; sleep 2; done']
+
+      containers:
+      - name: {{ $service.name }}
+        image: "{{ .Values.global.registry }}/{{ $service.image }}:{{ $service.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        
+        ports:
+        - name: http
+          containerPort: {{ $service.port }}
+          protocol: TCP
+        
+        env:
+        # Oracle Configuration
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            secretKeyRef:
+              name: oracle-credentials
+              key: jdbc-url
+        
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: oracle-credentials
+              key: username
+        
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oracle-credentials
+              key: password
+        
+        - name: TNS_ADMIN
+          value: {{ .Values.oracle.walletPath }}
+        
+        # Kafka Configuration
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          value: {{ .Values.kafka.bootstrapServers }}
+        
+        - name: SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS
+          value: {{ .Values.kafka.bootstrapServers }}
+        
+        - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
+          value: {{ .Values.kafka.bootstrapServers }}
+        
+        # Redis Configuration
+        - name: SPRING_REDIS_HOST
+          value: {{ .Values.redis.host }}
+        
+        - name: SPRING_REDIS_PORT
+          value: "{{ .Values.redis.port }}"
+        
+        # Application Configuration
+        - name: SPRING_APPLICATION_NAME
+          value: {{ $service.name }}
+        
+        - name: SERVER_PORT
+          value: "{{ $service.port }}"
+        
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        
+        - name: LOGGING_LEVEL_ROOT
+          value: {{ .Values.commonSettings.logLevel }}
+        
+        - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+          value: "health,metrics,prometheus,info"
+        
+        volumeMounts:
+        - name: oracle-wallet
+          mountPath: {{ .Values.oracle.walletPath }}
+          readOnly: true
+        
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        
+        # Probes
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+          initialDelaySeconds: {{ .Values.commonSettings.healthCheckStartPeriod }}
+          periodSeconds: {{ .Values.commonSettings.healthCheckInterval }}
+          timeoutSeconds: {{ .Values.commonSettings.healthCheckTimeout }}
+          failureThreshold: {{ .Values.commonSettings.healthCheckRetries }}
+        
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30
+        
+        resources:
+          {{- toYaml $service.resources | nindent 12 }}
+      
+      volumes:
+      - name: oracle-wallet
+        secret:
+          secretName: oracle-wallet
+          defaultMode: 0400
+      
+      - name: config
+        configMap:
+          name: crm-backend-config
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

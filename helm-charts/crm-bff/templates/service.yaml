@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.bff.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.bff.name }}
+    chart: {{ include "crm-bff.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.bff.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.bff.name }}
+  sessionAffinity: None

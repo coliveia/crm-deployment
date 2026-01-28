@@ -1,0 +1,13 @@
+apiVersion: v2
+name: crm-bff
+description: Helm chart for CRM BFF Service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - crm
+  - bff
+  - backend-for-frontend
+maintainers:
+  - name: CRM Team
+    email: crm@example.com

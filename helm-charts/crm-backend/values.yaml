@@ -1,0 +1,167 @@
+# Default values for crm-backend
+# This is a YAML-formatted file.
+
+global:
+  environment: dev
+  registry: lazarusacr.azurecr.io
+  imagePullPolicy: IfNotPresent
+
+# Oracle Database Configuration
+oracle:
+  host: adb.us-ashburn-1.oraclecloud.com
+  port: 1522
+  serviceName: gc557477e093c7a_crmdb_high.adb.oraclecloud.com
+  user: admin
+  # Password should be provided via secrets
+  walletPath: /opt/oracle/wallet
+
+# Kafka Configuration
+kafka:
+  bootstrapServers: kafka-broker:9092
+  brokers:
+    - kafka-broker-0:9092
+    - kafka-broker-1:9092
+    - kafka-broker-2:9092
+
+# Redis Configuration
+redis:
+  host: redis-master
+  port: 6379
+
+# Microservices Configuration
+services:
+  customerService:
+    name: crm-customer-service
+    image: crm-customer-service
+    tag: latest
+    port: 8081
+    replicas: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  caseManagementService:
+    name: crm-case-management-service
+    image: crm-case-management-service
+    tag: latest
+    port: 8080
+    replicas: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  slaManagementService:
+    name: crm-sla-management-service
+    image: crm-sla-management-service
+    tag: latest
+    port: 8081
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  interactionService:
+    name: crm-interaction-service
+    image: crm-interaction-service
+    tag: latest
+    port: 8084
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  workflowEngineService:
+    name: crm-workflow-engine-service
+    image: crm-workflow-engine-service
+    tag: latest
+    port: 8083
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  copilotService:
+    name: crm-copilot-service
+    image: crm-copilot-service
+    tag: latest
+    port: 8084
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Common settings
+commonSettings:
+  logLevel: INFO
+  metricsEnabled: true
+  tracingEnabled: true
+  healthCheckInterval: 30
+  healthCheckTimeout: 10
+  healthCheckStartPeriod: 40
+  healthCheckRetries: 3
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: crm-backend
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Node Affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

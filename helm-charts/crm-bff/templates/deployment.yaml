@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.bff.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.bff.name }}
+    version: {{ .Values.bff.tag }}
+    chart: {{ include "crm-bff.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.bff.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ .Values.bff.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.bff.name }}
+        version: {{ .Values.bff.tag }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.bff.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: {{ include "crm-bff.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      
+      # Init container to wait for backend services
+      initContainers:
+      - name: wait-for-backends
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z crm-customer-service 8081 && nc -z crm-case-management-service 8080; do echo waiting for backends; sleep 2; done']
+
+      containers:
+      - name: {{ .Values.bff.name }}
+        image: "{{ .Values.global.registry }}/{{ .Values.bff.image }}:{{ .Values.bff.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        
+        ports:
+        - name: http
+          containerPort: {{ .Values.bff.port }}
+          protocol: TCP
+        
+        env:
+        # Backend Services URLs
+        - name: CUSTOMER_SERVICE_URL
+          value: {{ .Values.backendServices.customerService }}
+        
+        - name: CASE_MANAGEMENT_SERVICE_URL
+          value: {{ .Values.backendServices.caseManagementService }}
+        
+        - name: SLA_MANAGEMENT_SERVICE_URL
+          value: {{ .Values.backendServices.slaManagementService }}
+        
+        - name: INTERACTION_SERVICE_URL
+          value: {{ .Values.backendServices.interactionService }}
+        
+        - name: WORKFLOW_ENGINE_SERVICE_URL
+          value: {{ .Values.backendServices.workflowEngineService }}
+        
+        - name: COPILOT_SERVICE_URL
+          value: {{ .Values.backendServices.copilotService }}
+        
+        # Application Configuration
+        - name: NODE_ENV
+          value: production
+        
+        - name: PORT
+          value: "{{ .Values.bff.port }}"
+        
+        - name: LOG_LEVEL
+          value: {{ .Values.commonSettings.logLevel }}
+        
+        - name: METRICS_ENABLED
+          value: "{{ .Values.commonSettings.metricsEnabled }}"
+        
+        - name: TRACING_ENABLED
+          value: "{{ .Values.commonSettings.tracingEnabled }}"
+        
+        # Probes
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ .Values.commonSettings.healthCheckStartPeriod }}
+          periodSeconds: {{ .Values.commonSettings.healthCheckInterval }}
+          timeoutSeconds: {{ .Values.commonSettings.healthCheckTimeout }}
+          failureThreshold: {{ .Values.commonSettings.healthCheckRetries }}
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30
+        
+        resources:
+          {{- toYaml .Values.bff.resources | nindent 12 }}
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,72 @@
+# Default values for crm-bff
+# This is a YAML-formatted file.
+
+global:
+  environment: dev
+  registry: lazarusacr.azurecr.io
+  imagePullPolicy: IfNotPresent
+
+# BFF Service Configuration
+bff:
+  name: crm-bff-service
+  image: crm-bff-service
+  tag: latest
+  port: 3001
+  replicas: 2
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Backend Services URLs (for BFF to call)
+backendServices:
+  customerService: http://crm-customer-service:8081
+  caseManagementService: http://crm-case-management-service:8080
+  slaManagementService: http://crm-sla-management-service:8081
+  interactionService: http://crm-interaction-service:8084
+  workflowEngineService: http://crm-workflow-engine-service:8083
+  copilotService: http://crm-copilot-service:8084
+
+# Common settings
+commonSettings:
+  logLevel: INFO
+  metricsEnabled: true
+  tracingEnabled: true
+  healthCheckInterval: 30
+  healthCheckTimeout: 10
+  healthCheckStartPeriod: 10
+  healthCheckRetries: 3
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: crm-bff
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Node Affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

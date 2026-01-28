@@ -1,0 +1,95 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crm-backend-config
+  namespace: crm-backend
+data:
+  application.yml: |
+    spring:
+      application:
+        name: crm-backend-service
+      
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.OracleDialect
+            format_sql: true
+            jdbc:
+              batch_size: 20
+              fetch_size: 50
+      
+      kafka:
+        bootstrap-servers: kafka-broker:9092
+        producer:
+          key-serializer: org.apache.kafka.common.serialization.StringSerializer
+          value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+        consumer:
+          bootstrap-servers: kafka-broker:9092
+          group-id: crm-backend-group
+          key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+          value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+          properties:
+            spring.json.trusted.packages: "*"
+      
+      redis:
+        host: redis-master
+        port: 6379
+    
+    server:
+      port: 8080
+      servlet:
+        context-path: /
+    
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,metrics,prometheus,info
+      endpoint:
+        health:
+          show-details: always
+    
+    logging:
+      level:
+        root: INFO
+        com.vivo.crm: DEBUG
+        org.springframework.web: DEBUG
+        org.hibernate.SQL: DEBUG
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crm-bff-config
+  namespace: crm-backend
+data:
+  .env: |
+    NODE_ENV=production
+    PORT=3001
+    LOG_LEVEL=info
+    METRICS_ENABLED=true
+    TRACING_ENABLED=true
+    
+    # Backend Services
+    CUSTOMER_SERVICE_URL=http://crm-customer-service:8081
+    CASE_MANAGEMENT_SERVICE_URL=http://crm-case-management-service:8080
+    SLA_MANAGEMENT_SERVICE_URL=http://crm-sla-management-service:8081
+    INTERACTION_SERVICE_URL=http://crm-interaction-service:8084
+    WORKFLOW_ENGINE_SERVICE_URL=http://crm-workflow-engine-service:8083
+    COPILOT_SERVICE_URL=http://crm-copilot-service:8084
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crm-frontend-config
+  namespace: crm-frontend
+data:
+  .env: |
+    VITE_BFF_URL=http://crm-bff-service:3001
+    VITE_ENVIRONMENT=development
+    VITE_LOG_LEVEL=debug

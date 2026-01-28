@@ -1,0 +1,22 @@
+{{- range $app := .Values.applications }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $app.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $app.name }}
+    chart: {{ include "crm-frontend.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ $app.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ $app.name }}
+  sessionAffinity: None
+{{- end }}
