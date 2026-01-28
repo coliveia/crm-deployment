@@ -29,6 +29,13 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Return the namespace
+*/}}
+{{- define "crm-backend.namespace" -}}
+{{- .Release.Namespace }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "crm-backend.serviceAccountName" -}}
