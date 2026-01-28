@@ -1,0 +1,337 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Infrastructure Services
+  # ============================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: crm-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+    ports:
+      - "2181:2181"
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: crm-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: crm-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+  # ============================================
+  # Backend Services
+  # ============================================
+
+  customer-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.customer-service
+    container_name: crm-customer-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  case-management-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.case-management-service
+    container_name: crm-case-management-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  sla-management-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.sla-management-service
+    container_name: crm-sla-management-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  interaction-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.interaction-service
+    container_name: crm-interaction-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8084:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  workflow-engine-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.workflow-engine-service
+    container_name: crm-workflow-engine-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  copilot-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.copilot-service
+    container_name: crm-copilot-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=gc557477e093c7a_crmdb_high.adb.oraclecloud.com)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=gc557477e093c7a_high.adb.oraclecloud.com)))
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=CRM@Oracle26ai#2026!
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - TNS_ADMIN=/opt/oracle/wallet
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JAVA_OPTS=-Djavax.net.ssl.trustStore=/opt/oracle/wallet/truststore.jks -Djavax.net.ssl.trustStorePassword=welcome1
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # BFF Service
+  # ============================================
+
+  bff-service:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.bff-service
+    container_name: crm-bff-service
+    depends_on:
+      - customer-service
+      - case-management-service
+      - sla-management-service
+      - interaction-service
+      - workflow-engine-service
+      - copilot-service
+      - kafka
+      - redis
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - CUSTOMER_SERVICE_URL=http://customer-service:8080
+      - CASE_SERVICE_URL=http://case-management-service:8080
+      - SLA_SERVICE_URL=http://sla-management-service:8080
+      - INTERACTION_SERVICE_URL=http://interaction-service:8080
+      - WORKFLOW_SERVICE_URL=http://workflow-engine-service:8080
+      - COPILOT_SERVICE_URL=http://copilot-service:8080
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - crm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # Frontend Services
+  # ============================================
+
+  agent-portal:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.agent-portal
+    container_name: crm-agent-portal
+    depends_on:
+      - bff-service
+    ports:
+      - "5175:80"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    networks:
+      - crm-network
+
+  workflow-admin-portal:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.workflow-admin-portal
+    container_name: crm-workflow-admin-portal
+    depends_on:
+      - bff-service
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    networks:
+      - crm-network
+
+networks:
+  crm-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
