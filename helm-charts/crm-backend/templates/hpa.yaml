@@ -5,30 +5,30 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $service.name }}-hpa
-  namespace: {{ include "crm-backend.namespace" . }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     app: {{ $service.name }}
-    chart: {{ include "crm-backend.chart" . }}
+    chart: {{ include "crm-backend.chart" $ }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: {{ $service.name }}
-  minReplicas: {{ .Values.autoscaling.minReplicas }}
-  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  minReplicas: {{ $.Values.autoscaling.minReplicas }}
+  maxReplicas: {{ $.Values.autoscaling.maxReplicas }}
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+        averageUtilization: {{ $.Values.autoscaling.targetCPUUtilizationPercentage }}
   - type: Resource
     resource:
       name: memory
       target:
         type: Utilization
-        averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+        averageUtilization: {{ $.Values.autoscaling.targetMemoryUtilizationPercentage }}
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300

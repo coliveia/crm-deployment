@@ -32,7 +32,7 @@ Create chart name and version as used by the chart label.
 Return the namespace
 */}}
 {{- define "crm-backend.namespace" -}}
-{{- default .Release.Namespace .Values.namespace }}
+{{- .Release.Namespace }}
 {{- end }}
 
 {{/*

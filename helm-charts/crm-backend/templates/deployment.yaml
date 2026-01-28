@@ -4,12 +4,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $service.name }}
-  namespace: {{ include "crm-backend.namespace" . }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     app: {{ $service.name }}
     version: {{ $service.tag }}
-    chart: {{ include "crm-backend.chart" . }}
-    release: {{ .Release.Name }}
+    chart: {{ include "crm-backend.chart" $ }}
+    release: {{ $.Release.Name }}
 spec:
   replicas: {{ $service.replicas }}
   strategy:
@@ -30,9 +30,9 @@ spec:
         prometheus.io/port: "{{ $service.port }}"
         prometheus.io/path: "/actuator/prometheus"
     spec:
-      serviceAccountName: {{ include "crm-backend.serviceAccountName" . }}
+      serviceAccountName: {{ include "crm-backend.serviceAccountName" $ }}
       securityContext:
-        {{- toYaml .Values.securityContext | nindent 8 }}
+        {{- toYaml $.Values.securityContext | nindent 8 }}
       
       # Init container to wait for dependencies
       initContainers:
@@ -46,8 +46,8 @@ spec:
 
       containers:
       - name: {{ $service.name }}
-        image: "{{ .Values.global.registry }}/{{ $service.image }}:{{ $service.tag }}"
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        image: "{{ $.Values.global.registry }}/{{ $service.image }}:{{ $service.tag }}"
+        imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
         
         ports:
         - name: http
@@ -75,24 +75,24 @@ spec:
               key: password
         
         - name: TNS_ADMIN
-          value: {{ .Values.oracle.walletPath }}
+          value: {{ $.Values.oracle.walletPath }}
         
         # Kafka Configuration
         - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-          value: {{ .Values.kafka.bootstrapServers }}
+          value: {{ $.Values.kafka.bootstrapServers }}
         
         - name: SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS
-          value: {{ .Values.kafka.bootstrapServers }}
+          value: {{ $.Values.kafka.bootstrapServers }}
         
         - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
-          value: {{ .Values.kafka.bootstrapServers }}
+          value: {{ $.Values.kafka.bootstrapServers }}
         
         # Redis Configuration
         - name: SPRING_REDIS_HOST
-          value: {{ .Values.redis.host }}
+          value: {{ $.Values.redis.host }}
         
         - name: SPRING_REDIS_PORT
-          value: "{{ .Values.redis.port }}"
+          value: "{{ $.Values.redis.port }}"
         
         # Application Configuration
         - name: SPRING_APPLICATION_NAME
@@ -105,14 +105,14 @@ spec:
           value: kubernetes
         
         - name: LOGGING_LEVEL_ROOT
-          value: {{ .Values.commonSettings.logLevel }}
+          value: {{ $.Values.commonSettings.logLevel }}
         
         - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
           value: "health,metrics,prometheus,info"
         
         volumeMounts:
         - name: oracle-wallet
-          mountPath: {{ .Values.oracle.walletPath }}
+          mountPath: {{ $.Values.oracle.walletPath }}
           readOnly: true
         
         - name: config
@@ -124,10 +124,10 @@ spec:
           httpGet:
             path: /actuator/health/liveness
             port: http
-          initialDelaySeconds: {{ .Values.commonSettings.healthCheckStartPeriod }}
-          periodSeconds: {{ .Values.commonSettings.healthCheckInterval }}
-          timeoutSeconds: {{ .Values.commonSettings.healthCheckTimeout }}
-          failureThreshold: {{ .Values.commonSettings.healthCheckRetries }}
+          initialDelaySeconds: {{ $.Values.commonSettings.healthCheckStartPeriod }}
+          periodSeconds: {{ $.Values.commonSettings.healthCheckInterval }}
+          timeoutSeconds: {{ $.Values.commonSettings.healthCheckTimeout }}
+          failureThreshold: {{ $.Values.commonSettings.healthCheckRetries }}
         
         readinessProbe:
           httpGet:
@@ -160,17 +160,17 @@ spec:
         configMap:
           name: crm-backend-config
       
-      {{- with .Values.nodeSelector }}
+      {{- with $.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       
-      {{- with .Values.affinity }}
+      {{- with $.Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       
-      {{- with .Values.tolerations }}
+      {{- with $.Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
